@@ -1,9 +1,25 @@
-Set-LocalUser -Name "Administrator" -Password (ConvertTo-SecureString -AsPlainText "Develop1234" -Force)
-Get-LocalUser -Name "Administrator" | Enable-LocalUser 
-Invoke-WebRequest https://bin.equinox.io/c/4VmDzA7iaHb/ngrok-stable-windows-amd64.zip -OutFile ngrok.zip
-tar xf ngrok.zip
-Copy ngrok.exe C:\Windows\System32
-cmd /c echo ./ngrok.exe authtoken "3FXg3L4EvG25jxRWiRaZVNPi6Hu_4uaMokgmcJrry78mC8Luy" >a.ps1
-cmd /c echo cmd /k start ngrok.exe tcp 3389 >>a.ps1
-cmd /c echo ping -n 999999 10.10.10.10 >>a.ps1
-.\a.ps1
+Set-ExecutionPolicy Bypass -Scope Process -Force
+
+$UserName = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name.Split("\")[-1]
+$PasswordPlain = "Develop1234"
+$SecurePassword = ConvertTo-SecureString $PasswordPlain -AsPlainText -Force
+
+Set-LocalUser -Name $UserName -Password $SecurePassword -ErrorAction SilentlyContinue
+Get-LocalUser -Name $UserName | Enable-LocalUser
+
+Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0
+Enable-NetFirewallRule -DisplayGroup "Remote Desktop" -ErrorAction SilentlyContinue
+
+$NgrokUrl = "https://equinox.io"
+$ZipFile = "$env:TEMP\ngrok.zip"
+
+Invoke-WebRequest -Uri $NgrokUrl -OutFile $ZipFile
+
+Expand-Archive -Path $ZipFile -DestinationPath . -Force
+Remove-Item -Path $ZipFile -Force
+
+.\ngrok.exe config add-authtoken "3FXg3L4EvG25jxRWiRaZVNPi6Hu_4uaMokgmcJrry78mC8Luy"
+
+Start-Process .\ngrok.exe -ArgumentList "tcp 3389" -WindowStyle Hidden
+
+ping.exe -t 127.0.0.1
