@@ -7,11 +7,10 @@ $SecurePassword = ConvertTo-SecureString $PasswordPlain -AsPlainText -Force
 Set-LocalUser -Name $UserName -Password $SecurePassword -ErrorAction SilentlyContinue
 Get-LocalUser -Name $UserName | Enable-LocalUser
 
-Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0
-Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "UserAuthentication" -Value 0
-Enable-NetFirewallRule -DisplayGroup "Remote Desktop" -ErrorAction SilentlyContinue
-
-Start-Service -Name "TermService" -ErrorAction SilentlyContinue
+Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0 -ErrorAction SilentlyContinue
+Start-Service sshd -ErrorAction SilentlyContinue
+Set-Service -Name sshd -StartupType 'Automatic'
+Enable-NetFirewallRule -Name "OpenSSH-Server-In-TCP" -ErrorAction SilentlyContinue
 
 if (-not (Get-Command ngrok -ErrorAction SilentlyContinue)) {
     choco install ngrok -y --no-progress
@@ -21,19 +20,19 @@ if (-not (Get-Command ngrok -ErrorAction SilentlyContinue)) {
 
 Start-Sleep -Seconds 3
 
-Start-Process "C:\ProgramData\chocolatey\bin\ngrok.exe" -ArgumentList "tcp 3389 --log=stdout" -RedirectStandardOutput ".\ngrok.log" -WindowStyle Hidden
+Start-Process "C:\ProgramData\chocolatey\bin\ngrok.exe" -ArgumentList "tcp 22 --log=stdout" -RedirectStandardOutput ".\ngrok.log" -WindowStyle Hidden
 
 Start-Sleep -Seconds 7
 
-$RdpAddress = Select-String -Path ".\ngrok.log" -Pattern "url=tcp://" | ForEach-Object { $_.Matches.Value }
-if ($RdpAddress) {
-    $CleanAddress = ($RdpAddress -split "url=tcp://")[-1]
+$SshAddress = Select-String -Path ".\ngrok.log" -Pattern "url=tcp://" | ForEach-Object { $_.Matches.Value }
+if ($SshAddress) {
+    $CleanAddress = ($SshAddress -split "url=tcp://")[-1]
     Write-Host "=================================================="
-    Write-Host "NEW RDP ADDRESS: $CleanAddress"
+    Write-Host "NEW SSH ADDRESS: $CleanAddress"
     Write-Host "=================================================="
 } else {
     Write-Host "Failed to parse address"
     Get-Content ".\ngrok.log" -Tail 10
 }
-ping.exe -t 127.0.0.1
 
+ping.exe -t 127.0.0.1
