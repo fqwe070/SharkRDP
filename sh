@@ -1,40 +1,28 @@
 Set-ExecutionPolicy Bypass -Scope Process -Force
 
-# Принудительно включаем TLS 1.2 для работы сетевых запросов
+# Принудительно включаем TLS 1.2
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
 $UserName = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name.Split("\")[-1]
 
-# 1. Скачивание и установка Xray-core
-$XrayDir = "C:\ProgramData\xray"
-if (-not (Test-Path $XrayDir)) {
-    New-Item -ItemType Directory -Path $XrayDir | Out-Null
+# 1. Установка Xray-core через Chocolatey (гарантирует обход блокировок загрузки)
+Write-Host "Installing Xray via Chocolatey..."
+if (-not (Get-Command xray -ErrorAction SilentlyContinue)) {
+    choco install xray -y --no-progress
 }
 
-Write-Host "Downloading Xray-core..."
-$XrayZip = "$XrayDir\xray.zip"
+# Пути по умолчанию для Chocolatey версии Xray
+$XrayDir = "C:\ProgramData\chocolatey\lib\xray\tools"
+$XrayExe = "C:\ProgramData\chocolatey\bin\xray.exe"
 
-# Очищаем старый файл, если он остался от прошлых запусков
-if (Test-Path $XrayZip) { Remove-Item $XrayZip -Force }
-
-# Используем curl.exe с флагами -L (follow redirects) и -sS (show errors) для гарантированной загрузки
-curl.exe -L -sS -o $XrayZip "https://github.com"
-
-# Проверка: если файл весит меньше 5 МБ, значит скачался некорректный архив
-if ((Get-Item $XrayZip).Length -lt 5242880) {
-    Write-Error "Download failed or file is too small. Trying alternative download method..."
-    Invoke-WebRequest -Uri "https://github.com" -OutFile $XrayZip -UseBasicParsing
-}
-
-Write-Host "Extracting Xray-core..."
-# Флаг -a заставляет tar автоматически определить тип сжатия zip
-tar.exe -axf $XrayZip -C $XrayDir
-Remove-Item $XrayZip -Force
-
-# Верификация успешной распаковки
-$XrayExe = "$XrayDir\xray.exe"
+# Если Chocolatey поставил в другую папку, делаем фолбэк поиск
 if (-not (Test-Path $XrayExe)) {
-    Write-Error "Critical Error: xray.exe was not found in $XrayDir after extraction."
+    $XrayExe = (Get-Command xray -ErrorAction SilentlyContinue).Source
+    $XrayDir = Split-Path $XrayExe
+}
+
+if (-not (Test-Path $XrayExe)) {
+    Write-Error "Critical Error: Xray installation failed via Chocolatey."
     Exit 1
 }
 
@@ -42,13 +30,14 @@ if (-not (Test-Path $XrayExe)) {
 Write-Host "Generating Reality keys and UUID..."
 $UUID = ([guid]::NewGuid()).Guid
 
+# Получаем ключи напрямую из бинарника
 $KeysOutput = & $XrayExe x25519
 $PrivateKey = ($KeysOutput | Select-String "Private key:").Line.Split(" ").Trim()
 $PublicKey = ($KeysOutput | Select-String "Public key:").Line.Split(" ").Trim()
 
 $ShortId = -join ((1..8) | ForEach-Object { "{0:x}" -f (Get-Random -Min 0 -Max 16) })
 
-# Выбор оптимального домена для маскировки в РФ (разрешенный CDN/сервис)
+# Выбор стабильного домена для маскировки в РФ (разрешенный CDN/сервис)
 $FakeDomain = "speedtest.net"
 
 # 3. Создание конфигурационного файла config.json под РФ
@@ -131,8 +120,8 @@ for ($i = 0; $i -lt 10; $i++) {
 if ($NgrokUrl) {
     $CleanAddress = $NgrokUrl -replace "tcp://", ""
     $AddrParts = $CleanAddress -split ":"
-    $HostName = $AddrParts[0]
-    $PortNumber = $AddrParts[1]
+    $HostName = $AddrParts
+    $PortNumber = $AddrParts
     
     $FormatString = "vless://{0}@{1}:{2}?security=reality&encryption=none&pbk={3}&headerType=none&fp=chrome&spx=%2F&type=tcp&flow=xtls-rprx-vision&sni={4}&sid={5}#Xray-Reality-RU"
     $VlessLink = $FormatString -f $UUID, $HostName, $PortNumber, $PublicKey, $FakeDomain, $ShortId
