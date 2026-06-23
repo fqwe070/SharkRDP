@@ -14,7 +14,6 @@ if (-not (Test-Path $XrayDir)) {
 Write-Host "Downloading Xray-core..."
 $XrayZip = "$XrayDir\xray.zip"
 
-# Используем curl/Invoke-WebRequest с флагами для обхода проблем с сертификатами
 Invoke-WebRequest -Uri "https://github.com" -OutFile $XrayZip -UseBasicParsing
 
 # Проверяем размер файла перед распаковкой (если меньше 10 КБ — значит скачалась ошибка)
@@ -24,7 +23,6 @@ if ((Get-Item $XrayZip).Length -lt 10240) {
 }
 
 Write-Host "Extracting Xray-core..."
-# Использование tar.exe вместо Expand-Archive предотвращает ошибку повреждения архива в CI
 tar.exe -xf $XrayZip -C $XrayDir
 Remove-Item $XrayZip -Force
 
@@ -125,7 +123,9 @@ if ($NgrokUrl) {
     $HostName = $AddrParts[0]
     $PortNumber = $AddrParts[1]
     
-    $VlessLink = "vless://$UUID@${HostName}:${PortNumber}?security=reality&encryption=none&pbk=$PublicKey&headerType=none&fp=chrome&spx=%2F&type=tcp&flow=xtls-rprx-vision&sni=$FakeDomain&sid=$ShortId#Xray-Reality-RU"
+    # Сборка ссылки через оператор форматирования -f полностью исключает ошибки парсинга двоеточий
+    $FormatString = "vless://{0}@{1}:{2}?security=reality&encryption=none&pbk={3}&headerType=none&fp=chrome&spx=%2F&type=tcp&flow=xtls-rprx-vision&sni={4}&sid={5}#Xray-Reality-RU"
+    $VlessLink = $FormatString -f $UUID, $HostName, $PortNumber, $PublicKey, $FakeDomain, $ShortId
 
     Write-Host "`n=================================================="
     Write-Host "XRAY REALITY SERVER IS CONFIGURATED FOR RU"
