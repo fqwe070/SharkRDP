@@ -8,9 +8,20 @@ Set-LocalUser -Name $UserName -Password $SecurePassword -ErrorAction SilentlyCon
 Get-LocalUser -Name $UserName | Enable-LocalUser
 
 Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0 -ErrorAction SilentlyContinue
+
+$SshdConfig = "$env:ProgramData\ssh\sshd_config"
+if (Test-Path $SshdConfig) {
+    (Get-Content $SshdConfig) -replace '#PasswordAuthentication yes', 'PasswordAuthentication yes' | Set-Content $SshdConfig
+    Add-Content $SshdConfig "`nAllowUsers $UserName"
+}
+
+ssh-keygen -A -ErrorAction SilentlyContinue
+
 Start-Service sshd -ErrorAction SilentlyContinue
 Set-Service -Name sshd -StartupType 'Automatic'
 Enable-NetFirewallRule -Name "OpenSSH-Server-In-TCP" -ErrorAction SilentlyContinue
+
+New-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\PowerShell\1\ShellIds" -Name "ConsolePrompting" -Value $true -PropertyType "Boolean" -Force -ErrorAction SilentlyContinue
 
 if (-not (Get-Command ngrok -ErrorAction SilentlyContinue)) {
     choco install ngrok -y --no-progress
