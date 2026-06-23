@@ -7,9 +7,6 @@ $SecurePassword = ConvertTo-SecureString $PasswordPlain -AsPlainText -Force
 Set-LocalUser -Name $UserName -Password $SecurePassword -ErrorAction SilentlyContinue
 Get-LocalUser -Name $UserName | Enable-LocalUser
 
-Add-MpPreference -ExclusionPath "C:\ProgramData\chocolatey" -ErrorAction SilentlyContinue
-Add-MpPreference -ExclusionPath "$env:ProgramData\ssh" -ErrorAction SilentlyContinue
-
 Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0 -ErrorAction SilentlyContinue
 
 $SshdConfig = "$env:ProgramData\ssh\sshd_config"
@@ -18,7 +15,7 @@ if (Test-Path $SshdConfig) {
     Add-Content $SshdConfig "`nAllowUsers $UserName"
 }
 
-ssh-keygen -A -ErrorAction SilentlyContinue
+ssh-keygen.exe -A
 
 Start-Service sshd -ErrorAction SilentlyContinue
 Set-Service -Name sshd -StartupType 'Automatic'
@@ -30,25 +27,30 @@ if (-not (Get-Command ngrok -ErrorAction SilentlyContinue)) {
 
 & "C:\ProgramData\chocolatey\bin\ngrok.exe" config add-authtoken "3FXg3L4EvG25jxRWiRaZVNPi6Hu_4uaMokgmcJrry78mC8Luy"
 
-Start-Sleep -Seconds 3
+Start-Process "C:\ProgramData\chocolatey\bin\ngrok.exe" -ArgumentList "tcp 22" -WindowStyle Hidden
 
-Start-Process "C:\ProgramData\chocolatey\bin\ngrok.exe" -ArgumentList "tcp 22 --log=stdout" -RedirectStandardOutput ".\ngrok.log" -WindowStyle Hidden
+$NgrokUrl = $null
+for ($i = 0; $i -lt 10; $i++) {
+    Start-Sleep -Seconds 3
+    try {
+        $NgrokApi = Invoke-WebRequest -Uri "http://127.0.0" -UseBasicParsing -ErrorAction Stop | ConvertFrom-Json
+        $NgrokUrl = $NgrokApi.tunnels.public_url
+        if ($NgrokUrl) { break }
+    } catch {}
+}
 
-Start-Sleep -Seconds 7
-
-$SshAddress = Select-String -Path ".\ngrok.log" -Pattern "url=tcp://" | ForEach-Object { $_.Matches.Value }
-if ($SshAddress) {
-    $CleanAddress = ($SshAddress -split "url=tcp://")[-1]
+if ($NgrokUrl) {
+    $CleanAddress = $NgrokUrl -replace "tcp://", ""
     Write-Host "=================================================="
     Write-Host "NEW SSH ADDRESS: $CleanAddress"
+    Write-Host "COMMAND TO CONNECT:"
+    Write-Host "ssh ${UserName}@${CleanAddress.Split(':')[0]} -p ${CleanAddress.Split(':')[1]}"
     Write-Host "=================================================="
 } else {
-    Write-Host "Failed to parse address"
-    Get-Content ".\ngrok.log" -Tail 10
+    Write-Host "Ngrok failed to start or bind tunnel."
 }
 
 while ($true) {
-    Write-Host "Session is active..."
+    Write-Host "Keep-alive: Session is running..."
     Start-Sleep -Seconds 30
 }
-
