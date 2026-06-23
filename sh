@@ -13,22 +13,27 @@ Enable-NetFirewallRule -DisplayGroup "Remote Desktop" -ErrorAction SilentlyConti
 
 Start-Service -Name "TermService" -ErrorAction SilentlyContinue
 
-choco install ngrok -y --no-progress
+if (-not (Get-Command ngrok -ErrorAction SilentlyContinue)) {
+    choco install ngrok -y --no-progress
+}
 
 & "C:\ProgramData\chocolatey\bin\ngrok.exe" config add-authtoken "3FXg3L4EvG25jxRWiRaZVNPi6Hu_4uaMokgmcJrry78mC8Luy"
 
 Start-Sleep -Seconds 3
 
-Start-Process "C:\ProgramData\chocolatey\bin\ngrok.exe" -ArgumentList "tcp 3389" -WindowStyle Hidden
+Start-Process "C:\ProgramData\chocolatey\bin\ngrok.exe" -ArgumentList "tcp 3389 --log=stdout" -RedirectStandardOutput ".\ngrok.log" -WindowStyle Hidden
 
-Start-Sleep -Seconds 5
+Start-Sleep -Seconds 7
 
-$NgrokApi = Invoke-WebRequest -Uri "http://127.0.0" -UseBasicParsing | ConvertFrom-Json
-$RdpAddress = $NgrokApi.tunnels.public_url -replace "tcp://", ""
-
-Write-Host "=================================================="
-Write-Host "NEW RDP ADDRESS:"
-Write-Host $RdpAddress
-Write-Host "=================================================="
-
+$RdpAddress = Select-String -Path ".\ngrok.log" -Pattern "url=tcp://" | ForEach-Object { $_.Matches.Value }
+if ($RdpAddress) {
+    $CleanAddress = ($RdpAddress -split "url=tcp://")[-1]
+    Write-Host "=================================================="
+    Write-Host "NEW RDP ADDRESS: $CleanAddress"
+    Write-Host "=================================================="
+} else {
+    Write-Host "Failed to parse address"
+    Get-Content ".\ngrok.log" -Tail 10
+}
 ping.exe -t 127.0.0.1
+
