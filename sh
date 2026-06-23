@@ -113,8 +113,8 @@ if ($NgrokUrl) {
     $HostName = $AddrParts[0]
     $PortNumber = $AddrParts[1]
     
-    # Ссылка включает необходимые параметры: flow, fp (fingerprint), sni и pbk
-    $VlessLink = "vless://$UUID@$HostName:$PortNumber?security=reality&encryption=none&pbk=$PublicKey&headerType=none&fp=chrome&spx=%2F&type=tcp&flow=xtls-rprx-vision&sni=$FakeDomain&sid=$ShortId#Xray-Reality-RU"
+    # Исправлено экранирование переменных внутри строки подключения
+    $VlessLink = "vless://$UUID@${HostName}:${PortNumber}?security=reality&encryption=none&pbk=$PublicKey&headerType=none&fp=chrome&spx=%2F&type=tcp&flow=xtls-rprx-vision&sni=$FakeDomain&sid=$ShortId#Xray-Reality-RU"
 
     Write-Host "`n=================================================="
     Write-Host "XRAY REALITY SERVER IS CONFIGURATED FOR RU"
@@ -130,3 +130,4 @@ while ($true) {
     Write-Host "Keep-alive: Xray and Ngrok tunnel are active..."
     Start-Sleep -Seconds 30
 }
+
