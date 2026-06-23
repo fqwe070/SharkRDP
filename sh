@@ -1,3 +1,4 @@
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 Set-ExecutionPolicy Bypass -Scope Process -Force
 
 $UserName = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name.Split("\")[-1]
@@ -10,10 +11,10 @@ Get-LocalUser -Name $UserName | Enable-LocalUser
 Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0
 Enable-NetFirewallRule -DisplayGroup "Remote Desktop" -ErrorAction SilentlyContinue
 
-$NgrokUrl = "https://equinox.io"
+$NgrokUrl = "https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-windows-amd64.zip"
 $ZipFile = "$env:TEMP\ngrok.zip"
 
-Invoke-WebRequest -Uri $NgrokUrl -OutFile $ZipFile
+Invoke-WebRequest -Uri $NgrokUrl -OutFile $ZipFile -UseBasicParsing
 
 Expand-Archive -Path $ZipFile -DestinationPath . -Force
 Remove-Item -Path $ZipFile -Force
