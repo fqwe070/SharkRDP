@@ -41,10 +41,14 @@ for ($i = 0; $i -lt 10; $i++) {
 
 if ($NgrokUrl) {
     $CleanAddress = $NgrokUrl -replace "tcp://", ""
+    $AddrParts = $CleanAddress -split ":"
+    $HostName = $AddrParts[0]
+    $PortNumber = $AddrParts[1]
+    
     Write-Host "=================================================="
     Write-Host "NEW SSH ADDRESS: $CleanAddress"
     Write-Host "COMMAND TO CONNECT:"
-    Write-Host "ssh ${UserName}@${CleanAddress.Split(':')[0]} -p ${CleanAddress.Split(':')[1]}"
+    Write-Host "ssh ${UserName}@${HostName} -p ${PortNumber}"
     Write-Host "=================================================="
 } else {
     Write-Host "Ngrok failed to start or bind tunnel."
