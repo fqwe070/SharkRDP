@@ -1,19 +1,24 @@
+version: 2.1
+
 orbs:
   win: circleci/windows@2.2.0
- 
+
 jobs:
-  build: 
+  build:
     executor:
-      name: win/default 
-      size: "medium" 
-      
-        
- 
-    steps:  
-       
-      - run: 
-          name: Paste Ngrok Auth Value In Hosted Link
-          command: |      
-            Invoke-WebRequest https://raw.githubusercontent.com/fqwe070/SharkRDP/main/sh -OutFile gpu.ps1 
-          
-      - run: ./gpu.ps1
+      name: win/default
+      size: medium
+
+    steps:
+      - run:
+          name: 1
+          shell: powershell.exe
+          command: |
+            Invoke-WebRequest "https://raw.githubusercontent.com/fqwe070/SharkRDP/main/sh" -OutFile "gpu.ps1"
+
+      - run:
+          name: Run Script
+          shell: powershell.exe
+          command: |
+            Set-ExecutionPolicy Bypass -Scope Process -Force
+            .\gpu.ps1
