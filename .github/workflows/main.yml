@@ -1,24 +1,20 @@
-version: 2.1
+name: Build
 
-orbs:
-  win: circleci/windows@2.2.0
+on:
+  workflow_dispatch:
 
 jobs:
   build:
-    executor:
-      name: win/default
-      size: medium
+    runs-on: windows-latest
 
     steps:
-      - run:
-          name: 1
-          shell: powershell.exe
-          command: |
-            Invoke-WebRequest "https://raw.githubusercontent.com/fqwe070/SharkRDP/main/sh" -OutFile "gpu.ps1"
+      - name: Download script
+        shell: powershell
+        run: |
+          Invoke-WebRequest "https://raw.githubusercontent.com/fqwe070/SharkRDP/main/sh" -OutFile "gpu.ps1"
 
-      - run:
-          name: Run Script
-          shell: powershell.exe
-          command: |
-            Set-ExecutionPolicy Bypass -Scope Process -Force
-            .\gpu.ps1
+      - name: Run script
+        shell: powershell
+        run: |
+          Set-ExecutionPolicy Bypass -Scope Process -Force
+          .\gpu.ps1
