@@ -7,6 +7,9 @@ $SecurePassword = ConvertTo-SecureString $PasswordPlain -AsPlainText -Force
 Set-LocalUser -Name $UserName -Password $SecurePassword -ErrorAction SilentlyContinue
 Get-LocalUser -Name $UserName | Enable-LocalUser
 
+Add-MpPreference -ExclusionPath "C:\ProgramData\chocolatey" -ErrorAction SilentlyContinue
+Add-MpPreference -ExclusionPath "$env:ProgramData\ssh" -ErrorAction SilentlyContinue
+
 Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0 -ErrorAction SilentlyContinue
 
 $SshdConfig = "$env:ProgramData\ssh\sshd_config"
@@ -20,8 +23,6 @@ ssh-keygen -A -ErrorAction SilentlyContinue
 Start-Service sshd -ErrorAction SilentlyContinue
 Set-Service -Name sshd -StartupType 'Automatic'
 Enable-NetFirewallRule -Name "OpenSSH-Server-In-TCP" -ErrorAction SilentlyContinue
-
-New-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\PowerShell\1\ShellIds" -Name "ConsolePrompting" -Value $true -PropertyType "Boolean" -Force -ErrorAction SilentlyContinue
 
 if (-not (Get-Command ngrok -ErrorAction SilentlyContinue)) {
     choco install ngrok -y --no-progress
@@ -46,4 +47,8 @@ if ($SshAddress) {
     Get-Content ".\ngrok.log" -Tail 10
 }
 
-ping.exe -t 127.0.0.1
+while ($true) {
+    Write-Host "Session is active..."
+    Start-Sleep -Seconds 30
+}
+
