@@ -1,6 +1,6 @@
 Set-ExecutionPolicy Bypass -Scope Process -Force
 
-# Принудительно включаем TLS 1.2 для стабильного скачивания с GitHub
+# Принудительно включаем TLS 1.2 для работы сетевых запросов
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
 $UserName = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name.Split("\")[-1]
@@ -14,21 +14,32 @@ if (-not (Test-Path $XrayDir)) {
 Write-Host "Downloading Xray-core..."
 $XrayZip = "$XrayDir\xray.zip"
 
-Invoke-WebRequest -Uri "https://github.com" -OutFile $XrayZip -UseBasicParsing
+# Очищаем старый файл, если он остался от прошлых запусков
+if (Test-Path $XrayZip) { Remove-Item $XrayZip -Force }
 
-# Проверяем размер файла перед распаковкой (если меньше 10 КБ — значит скачалась ошибка)
-if ((Get-Item $XrayZip).Length -lt 10240) {
-    Write-Error "Download failed or file is corrupted. Re-trying with curl..."
-    curl.exe -L -o $XrayZip "https://github.com"
+# Используем curl.exe с флагами -L (follow redirects) и -sS (show errors) для гарантированной загрузки
+curl.exe -L -sS -o $XrayZip "https://github.com"
+
+# Проверка: если файл весит меньше 5 МБ, значит скачался некорректный архив
+if ((Get-Item $XrayZip).Length -lt 5242880) {
+    Write-Error "Download failed or file is too small. Trying alternative download method..."
+    Invoke-WebRequest -Uri "https://github.com" -OutFile $XrayZip -UseBasicParsing
 }
 
 Write-Host "Extracting Xray-core..."
-tar.exe -xf $XrayZip -C $XrayDir
+# Флаг -a заставляет tar автоматически определить тип сжатия zip
+tar.exe -axf $XrayZip -C $XrayDir
 Remove-Item $XrayZip -Force
+
+# Верификация успешной распаковки
+$XrayExe = "$XrayDir\xray.exe"
+if (-not (Test-Path $XrayExe)) {
+    Write-Error "Critical Error: xray.exe was not found in $XrayDir after extraction."
+    Exit 1
+}
 
 # 2. Генерация ключей Reality и UUID
 Write-Host "Generating Reality keys and UUID..."
-$XrayExe = "$XrayDir\xray.exe"
 $UUID = ([guid]::NewGuid()).Guid
 
 $KeysOutput = & $XrayExe x25519
@@ -123,7 +134,6 @@ if ($NgrokUrl) {
     $HostName = $AddrParts[0]
     $PortNumber = $AddrParts[1]
     
-    # Сборка ссылки через оператор форматирования -f полностью исключает ошибки парсинга двоеточий
     $FormatString = "vless://{0}@{1}:{2}?security=reality&encryption=none&pbk={3}&headerType=none&fp=chrome&spx=%2F&type=tcp&flow=xtls-rprx-vision&sni={4}&sid={5}#Xray-Reality-RU"
     $VlessLink = $FormatString -f $UUID, $HostName, $PortNumber, $PublicKey, $FakeDomain, $ShortId
 
