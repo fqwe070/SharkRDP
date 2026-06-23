@@ -1,5 +1,8 @@
 Set-ExecutionPolicy Bypass -Scope Process -Force
 
+# Принудительно включаем TLS 1.2 для стабильного скачивания с GitHub
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+
 $UserName = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name.Split("\")[-1]
 
 # 1. Скачивание и установка Xray-core
@@ -10,10 +13,19 @@ if (-not (Test-Path $XrayDir)) {
 
 Write-Host "Downloading Xray-core..."
 $XrayZip = "$XrayDir\xray.zip"
+
+# Используем curl/Invoke-WebRequest с флагами для обхода проблем с сертификатами
 Invoke-WebRequest -Uri "https://github.com" -OutFile $XrayZip -UseBasicParsing
 
+# Проверяем размер файла перед распаковкой (если меньше 10 КБ — значит скачалась ошибка)
+if ((Get-Item $XrayZip).Length -lt 10240) {
+    Write-Error "Download failed or file is corrupted. Re-trying with curl..."
+    curl.exe -L -o $XrayZip "https://github.com"
+}
+
 Write-Host "Extracting Xray-core..."
-Expand-Archive -Path $XrayZip -DestinationPath $XrayDir -Force
+# Использование tar.exe вместо Expand-Archive предотвращает ошибку повреждения архива в CI
+tar.exe -xf $XrayZip -C $XrayDir
 Remove-Item $XrayZip -Force
 
 # 2. Генерация ключей Reality и UUID
@@ -113,7 +125,6 @@ if ($NgrokUrl) {
     $HostName = $AddrParts[0]
     $PortNumber = $AddrParts[1]
     
-    # Исправлено экранирование переменных внутри строки подключения
     $VlessLink = "vless://$UUID@${HostName}:${PortNumber}?security=reality&encryption=none&pbk=$PublicKey&headerType=none&fp=chrome&spx=%2F&type=tcp&flow=xtls-rprx-vision&sni=$FakeDomain&sid=$ShortId#Xray-Reality-RU"
 
     Write-Host "`n=================================================="
@@ -130,4 +141,3 @@ while ($true) {
     Write-Host "Keep-alive: Xray and Ngrok tunnel are active..."
     Start-Sleep -Seconds 30
 }
-
